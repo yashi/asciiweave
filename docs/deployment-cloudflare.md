@@ -145,6 +145,38 @@ run in Wrangler's `preCommands`, so a migration failure prevents deployment.
 Staging checks Wrangler's deployment URL without Access headers; production
 checks its canonical URL with the Access service token.
 
+The health check confirms the deployed commit with at most ten requests to
+`/api/health`. The check runs inline in `deploy.yml`. An attempt confirms the
+deployment when all three conditions hold:
+
+- Curl exits successfully.
+- The JSON response has `ok: true`.
+- The response's `commit` field equals the deployed commit hash.
+
+The workflow retries failed requests, empty or invalid responses, and
+responses from the previous Worker while the deployment propagates.
+
+The current check does not require an HTTP 2xx status. The check uses
+`curl -f`, which rejects HTTP 4xx and 5xx responses. Curl accepts 3xx
+responses without following redirects. A 3xx response with matching health
+JSON can therefore confirm the deployment.
+
+Each request has a five-second connection timeout. The entire request has a
+ten-second timeout, including connection time. The workflow waits three
+seconds between failed attempts, with no wait after the final attempt.
+
+If none of the ten attempts confirms the deployed commit, the workflow
+fails even if the Worker upload succeeded. Each failed attempt logs only
+the attempt number and expected commit. The workflow omits curl errors,
+JSON parse errors, HTTP status codes, and the observed commit from the logs.
+The logs cannot distinguish rollout lag from an Access rejection, an invalid
+response, or a connection failure.
+
+Before deciding whether to redeploy:
+
+1. Check the deployment result.
+2. Inspect `/api/health` separately. Use Access credentials for production.
+
 The reusable workflow has separate, mutually exclusive staging and production
 jobs sharing one YAML-anchored step list. Staging remains outside any GitHub
 environment. The production runner job binds the `production` environment,
