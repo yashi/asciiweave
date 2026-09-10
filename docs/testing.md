@@ -39,6 +39,15 @@ concurrency groups; the production runner job retains its GitHub environment.
 See [the deployment runbook](deployment-cloudflare.md) for target and secret
 handling.
 
+`server/tests/deployment-smoke.test.ts` exercises the deployment health-check
+script with simulated HTTP responses, including a previous commit followed by
+the deployed commit and exhausted retries. It runs under `npm test` and needs
+Bash and `jq` (both are preinstalled on the deployment's Ubuntu runner):
+
+```sh
+npm test -- server/tests/deployment-smoke.test.ts
+```
+
 ## Coverage expectations
 
 Preserve coverage for:

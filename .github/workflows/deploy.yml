@@ -69,21 +69,7 @@ jobs:
           ACCESS_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
           ACCESS_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
           DEPLOYED_COMMIT: ${{ github.sha }}
-        run: |
-          url="${SMOKE_TEST_URL:-$DEPLOYMENT_URL}"
-          headers=()
-          if [ "$SMOKE_TEST_ACCESS" = true ]; then
-            headers=(-H "CF-Access-Client-Id: $ACCESS_ID"
-                     -H "CF-Access-Client-Secret: $ACCESS_SECRET")
-          fi
-          for i in $(seq 1 10); do
-            body=$(curl -sf "${headers[@]}" "$url/api/health") && break
-            sleep 3
-          done
-          echo "health: $body"
-          echo "$body" | grep -q '"ok":true'
-          echo "$body" | grep -q "$DEPLOYED_COMMIT"
-          echo "Deployed commit $DEPLOYED_COMMIT to $url" >> "$GITHUB_STEP_SUMMARY"
+        run: bash .github/scripts/deployment-smoke.sh
 
   production:
     runs-on: ubuntu-latest

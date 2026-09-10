@@ -145,6 +145,14 @@ run in Wrangler's `preCommands`, so a migration failure prevents deployment.
 Staging checks Wrangler's deployment URL without Access headers; production
 checks its canonical URL with the Access service token.
 
+The health check retries up to ten times, waiting three seconds between
+attempts, until the response reports `ok: true` and the exact deployed commit.
+A healthy response from the previous Worker version is retried while the
+deployment propagates. Requests have a five-second connection timeout and a
+ten-second total timeout. Exhausting the attempts fails the workflow even if
+the Worker upload succeeded; inspect the deployment and health-check logs
+before deciding whether to redeploy.
+
 The reusable workflow has separate, mutually exclusive staging and production
 jobs sharing one YAML-anchored step list. Staging remains outside any GitHub
 environment. The production runner job binds the `production` environment,
