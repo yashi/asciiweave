@@ -54,6 +54,12 @@ and commands belong in [`testing.md`](testing.md).
   position. Keep scripts disabled by both the sandbox and a restrictive
   content security policy.
 - Do not allow arbitrary server-side `include::` access to the filesystem.
+- Render `[d2]` listing blocks locally in the browser, including in print
+  snapshots. Preserve block titles and source anchors. Preserve the original
+  D2 text in source exports.
+- Show D2 errors alongside the affected block's source without hiding other
+  document content.
+- Keep `[source,d2]` blocks as code listings.
 
 ## Preview styles and printing
 

@@ -45,6 +45,29 @@ for print settings and how to add a CSS file before deployment.
 There is not yet a visible source download control. To download the current AsciiDoc
 source, open `/api/documents/<id>/source` on the same deployment.
 
+## D2 diagrams
+
+Use a `[d2]` block to render a diagram in the preview and printed output:
+
+```asciidoc
+.Request flow
+[d2]
+----
+browser -> server: request
+server -> database: query
+----
+```
+
+asciiweave loads the D2 renderer when you first preview or print a D2 block.
+The renderer compiles diagrams in your browser. If a diagram fails to render,
+the preview shows the error above that block's source.
+The `.adoc` download preserves the original D2 text.
+
+Use `[source,d2]` to display D2 as code instead of a diagram.
+
+The preview embeds SVG output as images. Diagram links are not clickable.
+asciiweave does not support external file imports or external icons in D2 blocks.
+
 ## Security and access
 
 asciiweave does not currently implement application-level authentication,

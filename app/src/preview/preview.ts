@@ -1,9 +1,10 @@
 import { createToc } from './toc'
-import { load, type AbstractBlock } from '@asciidoctor/core'
+import { load, type AbstractBlock, type Block } from '@asciidoctor/core'
 import { createRenderScheduler, type RenderScheduler } from './scheduler'
 import { sourceLineForPosition, sourceSpanForLine, type SourceAnchor } from './scroll-sync'
 import { applyStyle, previewPage } from './page'
 import { defaultStyle, type PreviewStyle } from './styles'
+import { renderD2Blocks, type D2Block } from './d2'
 
 interface RenderedPreview {
   html: string
@@ -306,6 +307,7 @@ export async function renderPreview(source: string): Promise<RenderedPreview> {
   const titleId = `${prefix}-title`
   const headingIds: string[] = document.hasHeader() ? [titleId] : []
   const tableRowTargets: TableRowTargets[] = []
+  const diagrams: D2Block[] = []
   let generatedId = 0
   const assignedIds = new Set([titleId])
   const nextId = (): string => {
@@ -336,6 +338,10 @@ export async function renderPreview(source: string): Promise<RenderedPreview> {
         assignedIds.add(blockId)
         anchors.push({ line, id: blockId })
         if (context === 'section') headingIds.push(blockId)
+      }
+
+      if (context === 'listing' && block.getStyle() === 'd2' && blockId) {
+        diagrams.push({ id: blockId, source: (block as Block).getSource() })
       }
 
       if (context === 'table' && blockId) {
@@ -371,9 +377,12 @@ export async function renderPreview(source: string): Promise<RenderedPreview> {
   anchors.sort((left, right) => left.line - right.line)
 
   return {
-    html: addTableRowAnchors(
-      (await document.convert({ standalone: false })).replace(/^<h1>/, `<h1 id="${titleId}">`),
-      tableRowTargets,
+    html: await renderD2Blocks(
+      addTableRowAnchors(
+        (await document.convert({ standalone: false })).replace(/^<h1>/, `<h1 id="${titleId}">`),
+        tableRowTargets,
+      ),
+      diagrams,
     ),
     anchors,
     headingIds,

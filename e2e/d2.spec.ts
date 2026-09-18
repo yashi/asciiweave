@@ -1,0 +1,136 @@
+import { expect, test } from '@playwright/test'
+import { createDoc, getText, openPair, setSourceViaYjs } from './helpers'
+
+const source = '= Diagrams\n\n.Flow\n[d2]\n----\nclient -> server: 日本語\n----\n\nAfter diagram.'
+
+test('D2 renders locally for collaborators and preserves source export', async ({
+  browser,
+  baseURL,
+}) => {
+  const pair = await openPair(browser, baseURL!)
+  try {
+    for (const page of [pair.pageA, pair.pageB]) {
+      await page.route('**/*', (route) => {
+        if (new URL(route.request().url()).origin !== new URL(baseURL!).origin) return route.abort()
+        return route.continue()
+      })
+    }
+    await setSourceViaYjs(pair.pageA, source)
+    for (const page of [pair.pageA, pair.pageB]) {
+      const preview = page.frameLocator('.preview-frame')
+      const diagram = preview.locator('.d2-diagram img')
+      await expect(diagram).toHaveAttribute('alt', 'Flow', { timeout: 20_000 })
+      expect(
+        await diagram.evaluate(async (img: HTMLImageElement) => {
+          await img.decode()
+          return img.naturalWidth
+        }),
+      ).toBeGreaterThan(0)
+      const svg = decodeURIComponent(
+        (await diagram.getAttribute('src'))!.split(',').slice(1).join(','),
+      )
+      expect(svg).toContain('日本語')
+      expect(await preview.locator('.d2-diagram').getAttribute('id')).toBeTruthy()
+      await expect(preview.locator('.paragraph')).toContainText('After diagram.')
+      expect(await getText(page)).toBe(source)
+    }
+    const exported = await pair.pageA.request.get(
+      `${new URL(pair.url).pathname.replace('/doc/', '/api/documents/')}/source`,
+    )
+    expect(await exported.text()).toBe(source)
+    await setSourceViaYjs(
+      pair.pageB,
+      source.replace('client -> server: 日本語', 'browser -> database'),
+    )
+    for (const page of [pair.pageA, pair.pageB]) {
+      await expect
+        .poll(async () => {
+          const src = await page
+            .frameLocator('.preview-frame')
+            .locator('.d2-diagram img')
+            .getAttribute('src')
+          return decodeURIComponent(src ?? '')
+        })
+        .toContain('database')
+    }
+  } finally {
+    await pair.close()
+  }
+})
+
+test('D2 errors stay local to a block and recover after editing', async ({ page }) => {
+  await createDoc(page)
+  await setSourceViaYjs(
+    page,
+    '[d2]\n----\na: {\n----\n\n' + source + '\n\n[source,d2]\n----\nx -> y\n----',
+  )
+  const preview = page.frameLocator('.preview-frame')
+  await expect(preview.locator('.d2-error')).toContainText('D2 error:', { timeout: 20_000 })
+  await expect(preview.locator('.d2-diagram img')).toHaveCount(1)
+  await expect(preview.locator('code.language-d2')).toHaveText('x -> y')
+  await setSourceViaYjs(page, source + '\n\n[d2]\n----\nx -> y\n----')
+  await expect(preview.locator('.d2-diagram img')).toHaveCount(2)
+  await expect(preview.locator('.d2-error')).toHaveCount(0)
+  await expect(page.locator('.preview-frame')).toHaveAttribute('sandbox', 'allow-same-origin')
+})
+
+test('D2 images are ready in the print snapshot', async ({ page }) => {
+  await createDoc(page)
+  await page.evaluate(() => {
+    const observer = new MutationObserver(() => {
+      const iframe = document.querySelector<HTMLIFrameElement>('.print-frame')
+      if (!iframe) return
+      observer.disconnect()
+      iframe.addEventListener(
+        'load',
+        () => {
+          iframe.contentWindow!.print = () => {
+            iframe.dataset.printCalled = 'true'
+          }
+        },
+        { once: true },
+      )
+    })
+    observer.observe(document.body, { childList: true })
+  })
+  await setSourceViaYjs(page, source)
+  await page.getByRole('button', { name: 'Print / Save as PDF' }).click()
+  const frame = page.locator('.print-frame')
+  await expect(frame).toHaveAttribute('data-print-called', 'true', { timeout: 20_000 })
+  const diagram = page.frameLocator('.print-frame').locator('.d2-diagram img')
+  expect(
+    await diagram.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
+  ).toBe(true)
+  await frame.evaluate((iframe: HTMLIFrameElement) => {
+    iframe.contentWindow!.dispatchEvent(new Event('afterprint'))
+  })
+  await expect(frame).toHaveCount(0)
+})
+
+test('a delayed D2 render cannot replace newer document content', async ({ page }) => {
+  await createDoc(page)
+  let release!: () => void
+  const gate = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let requested!: () => void
+  const request = new Promise<void>((resolve) => {
+    requested = resolve
+  })
+  await page.route('**/assets/browser-*.js', async (route) => {
+    requested()
+    await gate
+    await route.continue()
+  })
+  await setSourceViaYjs(page, source)
+  await request
+  await setSourceViaYjs(page, '= Latest\n\nOrdinary text.')
+  const preview = page.frameLocator('.preview-frame')
+  await expect(preview.locator('h1')).toHaveText('Latest')
+  release()
+  await expect.poll(() => page.workers().length).toBeGreaterThan(0)
+  // Allow the older conversion to finish after the replacement has rendered.
+  await page.waitForTimeout(2000)
+  await expect(preview.locator('h1')).toHaveText('Latest')
+  await expect(preview.locator('.d2-diagram')).toHaveCount(0)
+})

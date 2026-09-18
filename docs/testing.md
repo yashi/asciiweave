@@ -126,6 +126,24 @@ content without saving to the user's filesystem; actual browser PDF output
 and page breaks additionally need visual review with the settings in
 [preview-styles.md](preview-styles.md).
 
+## D2 diagrams
+
+`app/tests/d2.test.ts` covers caching, render options, failures, and timeouts.
+`e2e/d2.spec.ts` exercises the bundled renderer in real browsers. The
+collaboration test blocks external requests. The browser tests cover:
+
+- collaboration and Unicode labels
+- preservation of the original source in exports
+- error recovery and multiple diagrams
+- D2 code listings
+- image readiness before printing
+- rejection of stale renders.
+
+```sh
+npm test -- app/tests/d2.test.ts
+npm run test:e2e -- e2e/d2.spec.ts
+```
+
 ## TOC navigation
 
 `e2e/toc.spec.ts` covers heading hierarchy, formatted Japanese labels, explicit

@@ -320,6 +320,31 @@ Static assets are served by Workers Assets with SPA fallback; only
 Deployment, environments, and rollback:
 [`deployment-cloudflare.md`](deployment-cloudflare.md).
 
+## D2 diagrams
+
+The browser renders `[d2]` listing blocks with `@d2lang/d2`.
+The preview collects these blocks from the Asciidoctor AST before HTML
+conversion. Each block retains its title and source anchor.
+
+The browser loads the renderer on demand. The renderer compiles diagrams in
+the package's Web Worker. Both server targets serve the renderer and its
+bundled WASM as browser assets. Diagram rendering requires no remote service.
+
+The compiler receives each block's literal source. asciiweave supplies no
+filesystem for D2 imports. The preview embeds SVG output as images with data
+URLs to isolate SVG markup and styles. These images disable diagram links
+and external icons.
+
+The renderer processes one diagram at a time, with a 15-second timeout for
+each diagram. A cache holds up to 32 entries for completed or pending renders.
+The cache avoids repeated compilation of unchanged diagrams during edits and
+printing.
+
+If a diagram fails to render, the preview keeps the block's source visible
+and shows a text error. The render scheduler rejects stale results after
+diagram rendering completes. Printing uses the same conversion path as the
+preview.
+
 ## Stale-render prevention
 
 Asciidoctor.js v4 conversion is asynchronous, and completions are not
