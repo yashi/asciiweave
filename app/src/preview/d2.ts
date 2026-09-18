@@ -4,41 +4,43 @@ let engine: D2 | undefined
 let queue: Promise<unknown> = Promise.resolve()
 const cache = new Map<string, Promise<string>>()
 
+async function compileD2(source: string): Promise<string> {
+  let current: D2 | undefined
+  let expired = false
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      (async () => {
+        const { D2 } = await import('@d2lang/d2')
+        if (expired) throw new Error('D2 rendering timed out')
+        current = engine ??= new D2()
+        const compiled = await current.compile(source)
+        if (expired) throw new Error('D2 rendering timed out')
+        return current.render(compiled.diagram, compiled.renderOptions)
+      })(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          expired = true
+          reject(new Error('D2 rendering timed out'))
+        }, 15_000)
+      }),
+    ])
+  } catch (error) {
+    if (current) {
+      engine = undefined
+      void current.dispose().catch(() => {})
+    }
+    throw error
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export function renderD2(source: string): Promise<string> {
   const cached = cache.get(source)
   if (cached) return cached
 
-  const result = queue.then(async () => {
-    let current: D2 | undefined
-    let expired = false
-    let timeout: ReturnType<typeof setTimeout> | undefined
-    try {
-      return await Promise.race([
-        (async () => {
-          const { D2 } = await import('@d2lang/d2')
-          if (expired) throw new Error('D2 rendering timed out')
-          current = engine ??= new D2()
-          const compiled = await current.compile(source)
-          if (expired) throw new Error('D2 rendering timed out')
-          return current.render(compiled.diagram, compiled.renderOptions)
-        })(),
-        new Promise<never>((_, reject) => {
-          timeout = setTimeout(() => {
-            expired = true
-            reject(new Error('D2 rendering timed out'))
-          }, 15_000)
-        }),
-      ])
-    } catch (error) {
-      if (current) {
-        engine = undefined
-        void current.dispose().catch(() => {})
-      }
-      throw error
-    } finally {
-      clearTimeout(timeout)
-    }
-  })
+  const result = queue.then(() => compileD2(source))
   queue = result.catch(() => {})
   cache.set(source, result)
   if (cache.size > 32) cache.delete(cache.keys().next().value!)
