@@ -15,3 +15,9 @@ export const UPSERT_YJS_STATE = `
   INSERT INTO yjs_state (id, state, updated_at) VALUES (?, ?, ?)
   ON CONFLICT(id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at
 `
+
+export const UPSERT_DOCUMENT_YJS_STATE = `
+  INSERT INTO yjs_state (id, state, updated_at)
+  SELECT id, ?, ? FROM documents WHERE id = ?
+  ON CONFLICT(id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at
+`

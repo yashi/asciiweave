@@ -37,6 +37,8 @@ export async function seedRoom(
   return false
 }
 
+const pendingPersists = new WeakMap<DocumentStore, Map<string, Promise<void>>>()
+
 // Persist the room's canonical CRDT state and the derived plain-text
 // representation alongside it. Rooms for IDs that are not documents are
 // never persisted.
@@ -46,11 +48,32 @@ export async function persistRoom(
   docName: string,
   ydoc: YDoc,
 ): Promise<void> {
-  if (!(await store.get(docName))) {
-    return
+  // Capture both representations before yielding to another room update.
+  const snapshot = {
+    state: Y.encodeStateAsUpdate(ydoc),
+    source: ydoc.getText('source').toString(),
   }
-  await store.setYjsState(docName, Y.encodeStateAsUpdate(ydoc))
-  await store.updateSource(docName, ydoc.getText('source').toString())
+  let queue = pendingPersists.get(store)
+  if (!queue) {
+    queue = new Map()
+    pendingPersists.set(store, queue)
+  }
+  const previous = queue.get(docName) ?? Promise.resolve()
+  const write = previous.then(async () => {
+    await store.saveSnapshot(docName, snapshot)
+  })
+  // Keep failures visible to callers while allowing the next write to run.
+  const settled = write.then(
+    () => {},
+    () => {},
+  )
+  queue.set(docName, settled)
+  void settled.then(() => {
+    if (queue.get(docName) === settled) {
+      queue.delete(docName)
+    }
+  })
+  return write
 }
 
 // Restore a room when the collaboration server creates it. The durable
@@ -84,7 +107,7 @@ export async function bindRoomStateWithControl(
     // restore those same items, not seed new ones that connected
     // browsers' later edits could never attach to.
     try {
-      await store.setYjsState(docName, Y.encodeStateAsUpdate(ydoc))
+      await persistRoom(Y, store, docName, ydoc)
     } catch (error) {
       console.error(`failed to persist seed for ${docName}:`, error)
     }

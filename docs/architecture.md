@@ -182,6 +182,32 @@ Every room update re-persists the full encoded state, debounced by ~1s
 That means durability does not depend on a graceful shutdown or on the
 last client leaving.
 
+`persistRoom` synchronously captures a snapshot of the encoded Yjs state and
+derived source before awaiting storage. Both representations describe the
+same room state.
+`DocumentStore.saveSnapshot` commits the snapshot, both timestamps, and one
+revision increment atomically.
+
+SQLite uses a transaction. D1 uses a
+[transactional batch](https://developers.cloudflare.com/d1/worker-api/d1-database/#batch).
+A failed statement leaves the previous snapshot, timestamps, and revision
+unchanged. If the document does not exist, `saveSnapshot` writes nothing.
+
+Each store instance has an independent write queue for each document ID.
+The queue executes writes in the order that callers request persistence.
+Debounced writes, seed persistence, and disconnect flushes use the same queue.
+A failed write rejects the caller's promise. The queue continues with the next
+write after a failure.
+
+Write ordering requires one room owner per document: one Node process for
+local hosting or one Durable Object on Cloudflare.
+
+Document creation encodes the initial source before calling
+`DocumentStore.createSnapshot`. The store commits both rows atomically at
+revision 1. For a new document, a failed insert leaves neither row.
+Application writes use the snapshot methods. The separate source and Yjs write
+methods support legacy data and repair.
+
 **One yjs module instance, ever.** `y-websocket/bin/utils` is CommonJS
 and `require`s the CJS build of yjs; server code that manipulates room
 docs must load yjs through `createRequire` so it gets that same instance

@@ -202,7 +202,7 @@ describe('durable Yjs persistence, deeply', () => {
       await store.create('doc', '')
       const failing: DocumentStore = {
         ...store,
-        setYjsState: async () => {
+        saveSnapshot: async () => {
           throw new Error('disk full')
         },
       }

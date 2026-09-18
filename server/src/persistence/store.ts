@@ -14,7 +14,18 @@ export interface DocumentRecord {
   updated_at: string
 }
 
+export interface DocumentSnapshot {
+  source: string
+  state: Uint8Array
+}
+
 export interface DocumentStore {
+  // Commit both representations atomically. Updates increment revision once
+  // and return false without writing anything when the document is missing.
+  createSnapshot(id: string, snapshot: DocumentSnapshot): Promise<DocumentRecord>
+  saveSnapshot(id: string, snapshot: DocumentSnapshot): Promise<boolean>
+  // Low-level operations for legacy data and repair. Application writes use
+  // the snapshot operations above.
   create(id: string, source: string): Promise<DocumentRecord>
   get(id: string): Promise<DocumentRecord | undefined>
   updateSource(id: string, source: string): Promise<boolean>

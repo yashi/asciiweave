@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { describeStoreContract } from './store-contract'
+import { describeSnapshotContract } from './snapshot-contract'
 import {
   applyMigrations,
   migrationStatus,
@@ -13,6 +14,22 @@ import {
 
 // The shared behavioral contract, against in-memory node:sqlite.
 describeStoreContract(() => openStore(':memory:'))
+
+describeSnapshotContract(() => {
+  const dir = mkdtempSync(join(tmpdir(), 'asciiweave-snapshot-'))
+  const path = join(dir, 'snapshot.db')
+  const store = openStore(path)
+  const db = openDatabase(path)
+  return {
+    store,
+    exec: (sql) => db.exec(sql),
+    close() {
+      db.close()
+      store.close()
+      rmSync(dir, { recursive: true, force: true })
+    },
+  }
+})
 
 describe('sqlite store', () => {
   let dir: string

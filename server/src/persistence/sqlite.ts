@@ -7,6 +7,7 @@ import {
   SELECT_DOCUMENT,
   SELECT_YJS_STATE,
   UPDATE_DOCUMENT_SOURCE,
+  UPSERT_DOCUMENT_YJS_STATE,
   UPSERT_YJS_STATE,
 } from './queries'
 import type { DocumentRecord, DocumentStore } from './store'
@@ -134,8 +135,36 @@ export function openStore(path: string, migrationsDir: string = MIGRATIONS_DIR):
   const update = db.prepare(UPDATE_DOCUMENT_SOURCE)
   const selectY = db.prepare(SELECT_YJS_STATE)
   const upsertY = db.prepare(UPSERT_YJS_STATE)
+  const upsertSnapshotY = db.prepare(UPSERT_DOCUMENT_YJS_STATE)
+
+  function transaction<T>(write: () => T): T {
+    db.exec('BEGIN IMMEDIATE')
+    try {
+      const result = write()
+      db.exec('COMMIT')
+      return result
+    } catch (error) {
+      db.exec('ROLLBACK')
+      throw error
+    }
+  }
 
   return {
+    async createSnapshot(id, { source, state }) {
+      const now = new Date().toISOString()
+      return transaction(() => {
+        insert.run(id, source, now, now)
+        upsertY.run(id, state, now)
+        return { id, source, revision: 1, created_at: now, updated_at: now }
+      })
+    },
+    async saveSnapshot(id, { source, state }) {
+      const now = new Date().toISOString()
+      return transaction(() => {
+        upsertSnapshotY.run(state, now, id)
+        return update.run(source, now, id).changes === 1
+      })
+    },
     async create(id, source) {
       const now = new Date().toISOString()
       insert.run(id, source, now, now)

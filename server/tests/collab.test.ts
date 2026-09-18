@@ -9,6 +9,14 @@ import type { DocumentStore } from '../src/persistence/store'
 // documents must never mix structs from the ESM and CJS builds.
 const Y = createRequire(import.meta.url)('yjs') as typeof YTypes
 
+function deferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
+  return { promise, resolve }
+}
+
 describe('collaboration rooms', () => {
   let store: DocumentStore
 
@@ -80,6 +88,116 @@ describe('collaboration rooms', () => {
     await expect(persistRoom(store, 'unknown', ydoc)).resolves.toBeUndefined()
     expect(await store.get('unknown')).toBeUndefined()
     expect(await store.getYjsState('unknown')).toBeUndefined()
+  })
+
+  it('captures matching snapshots and serializes overlapping writes per document', async () => {
+    await store.create('abc', '')
+    await store.create('other', '')
+    const room = new Y.Doc()
+    const other = new Y.Doc()
+    const started = deferred()
+    const release = deferred()
+    const saved: string[] = []
+    const delayed: DocumentStore = {
+      ...store,
+      async saveSnapshot(id, snapshot) {
+        if (id === 'abc' && saved.length === 0) {
+          started.resolve()
+          await release.promise
+        }
+        const restored = new Y.Doc()
+        Y.applyUpdate(restored, snapshot.state)
+        expect(restored.getText('source').toString()).toBe(snapshot.source)
+        restored.destroy()
+        saved.push(snapshot.source)
+        return store.saveSnapshot(id, snapshot)
+      },
+    }
+    room.getText('source').insert(0, 'first')
+    const first = persistRoom(delayed, 'abc', room)
+    await started.promise
+    room.getText('source').insert(5, ' second')
+    const second = persistRoom(delayed, 'abc', room)
+    other.getText('source').insert(0, 'independent')
+    await persistRoom(delayed, 'other', other)
+    expect(saved).toEqual(['independent'])
+    release.resolve()
+    await Promise.all([first, second])
+    expect(saved).toEqual(['independent', 'first', 'first second'])
+    expect(await store.get('abc')).toMatchObject({ source: 'first second', revision: 3 })
+    const restored = new Y.Doc()
+    Y.applyUpdate(restored, (await store.getYjsState('abc'))!)
+    expect(restored.getText('source').toString()).toBe('first second')
+    room.destroy()
+    other.destroy()
+    restored.destroy()
+  })
+
+  it('continues queued persists after a failed write', async () => {
+    await store.create('abc', '')
+    const room = new Y.Doc()
+    const started = deferred()
+    const release = deferred()
+    let calls = 0
+    const failing: DocumentStore = {
+      ...store,
+      async saveSnapshot(id, snapshot) {
+        if (++calls === 1) {
+          started.resolve()
+          await release.promise
+          throw new Error('disk full')
+        }
+        return store.saveSnapshot(id, snapshot)
+      },
+    }
+    room.getText('source').insert(0, 'first')
+    const failed = expect(persistRoom(failing, 'abc', room)).rejects.toThrow('disk full')
+    await started.promise
+    room.getText('source').insert(5, ' recovered')
+    const next = persistRoom(failing, 'abc', room)
+    release.resolve()
+    await failed
+    await next
+    expect(await store.get('abc')).toMatchObject({ source: 'first recovered', revision: 2 })
+    room.destroy()
+  })
+
+  it('queues a disconnect flush behind an in-flight debounced persist', async () => {
+    vi.useFakeTimers()
+    const room = new Y.Doc()
+    const started = deferred()
+    const release = deferred()
+    try {
+      await store.create('abc', '')
+      let calls = 0
+      const delayed: DocumentStore = {
+        ...store,
+        async saveSnapshot(id, snapshot) {
+          if (++calls === 1) {
+            started.resolve()
+            await release.promise
+          }
+          return store.saveSnapshot(id, snapshot)
+        },
+      }
+      await bindRoomState(delayed, 'abc', room, 100)
+      room.getText('source').insert(0, 'debounced')
+      await vi.advanceTimersByTimeAsync(100)
+      await started.promise
+      room.getText('source').insert(9, ' flushed')
+      const flush = persistRoom(delayed, 'abc', room)
+      room.destroy()
+      expect(calls).toBe(1)
+      release.resolve()
+      await flush
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(calls).toBe(2)
+      expect(await store.get('abc')).toMatchObject({ source: 'debounced flushed', revision: 3 })
+    } finally {
+      release.resolve()
+      room.destroy()
+      vi.useRealTimers()
+    }
   })
 
   it('restores a room from durable CRDT state, which wins over plain text', async () => {

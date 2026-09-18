@@ -4,6 +4,7 @@ import {
   SELECT_DOCUMENT,
   SELECT_YJS_STATE,
   UPDATE_DOCUMENT_SOURCE,
+  UPSERT_DOCUMENT_YJS_STATE,
   UPSERT_YJS_STATE,
 } from './queries'
 import type { DocumentRecord, DocumentStore } from './store'
@@ -26,6 +27,22 @@ function toUint8Array(state: ArrayBuffer | number[]): Uint8Array {
 
 export function createD1Store(db: D1Database): DocumentStore {
   return {
+    async createSnapshot(id, { source, state }) {
+      const now = new Date().toISOString()
+      await db.batch([
+        db.prepare(INSERT_DOCUMENT).bind(id, source, now, now),
+        db.prepare(UPSERT_YJS_STATE).bind(id, toArrayBuffer(state), now),
+      ])
+      return { id, source, revision: 1, created_at: now, updated_at: now }
+    },
+    async saveSnapshot(id, { source, state }) {
+      const now = new Date().toISOString()
+      const results = await db.batch([
+        db.prepare(UPSERT_DOCUMENT_YJS_STATE).bind(toArrayBuffer(state), now, id),
+        db.prepare(UPDATE_DOCUMENT_SOURCE).bind(source, now, id),
+      ])
+      return results[1]!.meta.changes === 1
+    },
     async create(id, source) {
       const now = new Date().toISOString()
       await db.prepare(INSERT_DOCUMENT).bind(id, source, now, now).run()

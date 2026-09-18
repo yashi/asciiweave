@@ -45,10 +45,10 @@ export function createApp(store: DocumentStore, codec: StateCodec, options: AppO
   })
 
   app.post('/api/documents', async (c) => {
-    const doc = await store.create(generateDocumentId(), INITIAL_SOURCE)
-    // Authoritative CRDT state exists from birth; the plain-text row is
-    // only a derived representation.
-    await store.setYjsState(doc.id, codec.encodeSourceAsState(INITIAL_SOURCE))
+    const doc = await store.createSnapshot(generateDocumentId(), {
+      source: INITIAL_SOURCE,
+      state: codec.encodeSourceAsState(INITIAL_SOURCE),
+    })
     return c.json({ id: doc.id }, 201)
   })
 
