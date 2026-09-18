@@ -127,10 +127,37 @@ test('a delayed D2 render cannot replace newer document content', async ({ page 
   await setSourceViaYjs(page, '= Latest\n\nOrdinary text.')
   const preview = page.frameLocator('.preview-frame')
   await expect(preview.locator('h1')).toHaveText('Latest')
+  const loaded = page.waitForResponse('**/assets/browser-*.js')
   release()
-  await expect.poll(() => page.workers().length).toBeGreaterThan(0)
+  await (await loaded).finished()
   // Allow the older conversion to finish after the replacement has rendered.
   await page.waitForTimeout(2000)
   await expect(preview.locator('h1')).toHaveText('Latest')
   await expect(preview.locator('.d2-diagram')).toHaveCount(0)
+  expect(page.workers()).toHaveLength(0)
+})
+
+test('a new edit cancels a stalled worker request and renders every current diagram', async ({
+  page,
+}) => {
+  await createDoc(page)
+  await page.evaluate(() => {
+    const postMessage = Worker.prototype.postMessage
+    let stalled = false
+    Worker.prototype.postMessage = function (message: { type?: string }) {
+      if (!stalled && message.type === 'compile') {
+        stalled = true
+        document.body.dataset.d2Stalled = 'true'
+        return
+      }
+      postMessage.call(this, message)
+    }
+  })
+  await setSourceViaYjs(page, source)
+  await expect(page.locator('body')).toHaveAttribute('data-d2-stalled', 'true', { timeout: 10_000 })
+  await setSourceViaYjs(page, '= Current\n\n[d2]\n----\na -> b\n----\n\n[d2]\n----\nc -> d\n----')
+  const preview = page.frameLocator('.preview-frame')
+  await expect(preview.locator('.d2-diagram img')).toHaveCount(2, { timeout: 5000 })
+  await expect(preview.locator('h1')).toHaveText('Current')
+  await expect(preview.locator('.d2-error')).toHaveCount(0)
 })

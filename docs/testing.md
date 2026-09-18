@@ -129,6 +129,8 @@ and page breaks additionally need visual review with the settings in
 ## D2 diagrams
 
 `app/tests/d2.test.ts` covers caching, render options, failures, and timeouts.
+It also checks cancellation during loading and compilation, skipped obsolete
+jobs, and shared work for previews and print snapshots.
 `e2e/d2.spec.ts` exercises the bundled renderer in real browsers. The
 collaboration test blocks external requests. The browser tests cover:
 
@@ -137,7 +139,8 @@ collaboration test blocks external requests. The browser tests cover:
 - error recovery and multiple diagrams
 - D2 code listings
 - image readiness before printing
-- rejection of stale renders.
+- rejection of stale renders
+- recovery from a stalled worker request after an edit.
 
 ```sh
 npm test -- app/tests/d2.test.ts

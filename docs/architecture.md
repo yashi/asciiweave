@@ -335,10 +335,25 @@ filesystem for D2 imports. The preview embeds SVG output as images with data
 URLs to isolate SVG markup and styles. These images disable diagram links
 and external icons.
 
-The renderer processes one diagram at a time, with a 15-second timeout for
-each diagram. A cache holds up to 32 entries for completed or pending renders.
-The cache avoids repeated compilation of unchanged diagrams during edits and
-printing.
+The renderer processes one diagram at a time. Each job has a 15-second
+timeout that starts when the job reaches the front of the queue. The timeout
+includes module loading, worker initialization, compilation, and SVG rendering.
+
+A cache holds up to 32 completed SVG results, keyed by D2 source text.
+Requests for identical source share a pending job while that job remains
+needed. A consumer is one diagram request from a preview or print snapshot.
+Each pending job tracks its consumers separately from the completed cache.
+
+Each preview conversion has an abort signal. A new edit or preview disposal
+aborts the conversion and releases its consumers. When a job has no remaining
+consumers, the queue skips it or cancels its active work. Cancellation releases
+the queue without waiting for the 15-second timeout. If module loading finishes
+after cancellation, the canceled job does not start compilation.
+
+A shared job continues while another preview or print snapshot needs its
+result. Printing does not use the preview's abort signal, so editing cannot
+cancel a print snapshot. Canceling one obsolete conversion does not remove
+other diagrams from the current conversion.
 
 If a diagram fails to render, the preview keeps the block's source visible
 and shows a text error. The render scheduler rejects stale results after
@@ -347,13 +362,17 @@ preview.
 
 ## Stale-render prevention
 
-Asciidoctor.js v4 conversion is asynchronous, and completions are not
-guaranteed to arrive in submission order. `app/src/preview/scheduler.ts`
-gives every started conversion a generation number and applies a result only
-if no newer conversion has started since. Combined with a ~200 ms debounce,
-rapid typing can never leave stale output on screen. The scheduler takes the
-convert/apply functions as parameters so the ordering logic is unit-tested
-without a real converter.
+Asciidoctor.js v4 conversion is asynchronous, and completions can arrive out
+of order. `app/src/preview/scheduler.ts` gives each conversion a generation
+number and an abort signal. A new edit aborts the previous conversion
+immediately. The scheduler waits approximately 200 ms after the last edit
+before starting its replacement.
+
+The scheduler applies a result only if its generation is current and its
+signal is not aborted. The same checks suppress errors from obsolete
+conversions. Conversion steps that ignore cancellation can finish, but the
+scheduler discards their results. The scheduler accepts convert/apply
+functions so tests can check ordering without a real converter.
 
 ## Preview isolation
 

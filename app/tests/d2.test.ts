@@ -35,7 +35,8 @@ describe('D2 rendering', () => {
   it('reuses identical diagrams and passes source configuration to the renderer', async () => {
     const { renderD2 } = await import('../src/preview/d2')
     const first = renderD2('a -> b')
-    expect(renderD2('a -> b')).toBe(first)
+    const second = renderD2('a -> b')
+    expect(await second).toBe('<svg/>')
     expect(await first).toBe('<svg/>')
     expect(mocks.compile).toHaveBeenCalledTimes(1)
     expect(mocks.render).toHaveBeenCalledWith({}, { themeID: 4 })
@@ -85,5 +86,92 @@ describe('D2 rendering', () => {
     expect(mocks.dispose).not.toHaveBeenCalled()
     await expect(renderD2('first')).resolves.toBe('<svg/>')
     expect(mocks.compile).toHaveBeenCalledExactlyOnceWith('first')
+  })
+
+  it('cancels active and queued obsolete diagrams without waiting for their timeouts', async () => {
+    vi.useFakeTimers()
+    const { renderD2 } = await import('../src/preview/d2')
+    const obsolete = new AbortController()
+    let finishCompile!: (value: unknown) => void
+    mocks.compile.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishCompile = resolve
+        }),
+    )
+    const first = expect(renderD2('active', obsolete.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    const second = expect(renderD2('queued', obsolete.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mocks.compile).toHaveBeenCalledExactlyOnceWith('active')
+    obsolete.abort()
+    await Promise.all([first, second])
+    await expect(renderD2('latest')).resolves.toBe('<svg/>')
+    expect(mocks.compile.mock.calls.map(([source]) => source)).toEqual(['active', 'latest'])
+    expect(mocks.dispose).toHaveBeenCalledTimes(1)
+    finishCompile({ diagram: {}, renderOptions: {} })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mocks.render).toHaveBeenCalledTimes(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('preserves shared print work and every diagram in the latest preview', async () => {
+    vi.useFakeTimers()
+    const { renderD2 } = await import('../src/preview/d2')
+    const obsolete = new AbortController()
+    const latest = new AbortController()
+    let finishCompile!: (value: unknown) => void
+    mocks.compile.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishCompile = resolve
+        }),
+    )
+    const oldPreview = expect(renderD2('shared', obsolete.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    const print = renderD2('shared')
+    const previewA = renderD2('shared', latest.signal)
+    const previewB = renderD2('other diagram', latest.signal)
+    await vi.advanceTimersByTimeAsync(0)
+    obsolete.abort()
+    await oldPreview
+    expect(mocks.dispose).not.toHaveBeenCalled()
+    finishCompile({ diagram: {}, renderOptions: {} })
+    await expect(Promise.all([print, previewA, previewB])).resolves.toEqual([
+      '<svg/>',
+      '<svg/>',
+      '<svg/>',
+    ])
+    expect(mocks.compile.mock.calls.map(([source]) => source)).toEqual(['shared', 'other diagram'])
+    await expect(renderD2('shared')).resolves.toBe('<svg/>')
+    expect(mocks.compile).toHaveBeenCalledTimes(2)
+  })
+
+  it('cancels during module loading and only starts the replacement after loading', async () => {
+    vi.useFakeTimers()
+    const { renderD2 } = await import('../src/preview/d2')
+    let release!: () => void
+    mocks.load.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve
+        }),
+    )
+    const obsolete = new AbortController()
+    const oldPreview = expect(renderD2('old', obsolete.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    obsolete.abort()
+    await oldPreview
+    const latest = renderD2('latest')
+    release()
+    await expect(latest).resolves.toBe('<svg/>')
+    expect(mocks.construct).toHaveBeenCalledTimes(1)
+    expect(mocks.compile).toHaveBeenCalledExactlyOnceWith('latest')
   })
 })

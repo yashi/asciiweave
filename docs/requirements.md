@@ -60,6 +60,8 @@ and commands belong in [`testing.md`](testing.md).
 - Show D2 errors alongside the affected block's source without hiding other
   document content.
 - Keep `[source,d2]` blocks as code listings.
+- Cancel obsolete D2 preview work without canceling diagrams that another
+  preview or print snapshot still needs.
 
 ## Preview styles and printing
 

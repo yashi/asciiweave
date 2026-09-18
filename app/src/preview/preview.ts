@@ -297,11 +297,15 @@ export function createPreview(
   }
 }
 
-export async function renderPreview(source: string): Promise<RenderedPreview> {
+export async function renderPreview(
+  source: string,
+  signal?: AbortSignal,
+): Promise<RenderedPreview> {
   const document = await load(source, {
     attributes: { showtitle: true },
     sourcemap: true,
   })
+  signal?.throwIfAborted()
   const prefix = `asciiweave-source-${++renderSequence}`
   const anchors: SourceAnchor[] = []
   const titleId = `${prefix}-title`
@@ -383,6 +387,7 @@ export async function renderPreview(source: string): Promise<RenderedPreview> {
         tableRowTargets,
       ),
       diagrams,
+      signal,
     ),
     anchors,
     headingIds,

@@ -11,24 +11,29 @@ export interface RenderScheduler {
 // newer conversion has started since, so stale output can never overwrite a
 // newer render.
 export function createRenderScheduler<Output = string>(
-  convert: (source: string) => Promise<Output>,
+  convert: (source: string, signal: AbortSignal) => Promise<Output>,
   apply: (output: Output) => void,
   onError: (error: unknown) => void,
   { debounceMs = 200 }: { debounceMs?: number } = {},
 ): RenderScheduler {
+  let controller: AbortController | undefined
   let generation = 0
   let disposed = false
   let timer: ReturnType<typeof setTimeout> | undefined
 
   async function run(source: string): Promise<void> {
+    if (disposed) return
+    controller?.abort()
+    controller = new AbortController()
+    const signal = controller.signal
     const gen = ++generation
     try {
-      const html = await convert(source)
-      if (!disposed && gen === generation) {
+      const html = await convert(source, signal)
+      if (!disposed && !signal.aborted && gen === generation) {
         apply(html)
       }
     } catch (error) {
-      if (!disposed && gen === generation) {
+      if (!disposed && !signal.aborted && gen === generation) {
         onError(error)
       }
     }
@@ -36,6 +41,7 @@ export function createRenderScheduler<Output = string>(
 
   return {
     update(source) {
+      controller?.abort()
       clearTimeout(timer)
       timer = setTimeout(() => void run(source), debounceMs)
     },
@@ -45,6 +51,7 @@ export function createRenderScheduler<Output = string>(
     },
     dispose() {
       disposed = true
+      controller?.abort()
       clearTimeout(timer)
     },
   }

@@ -101,4 +101,31 @@ describe('render scheduler', () => {
     await vi.runAllTimersAsync()
     expect(applied).toEqual([])
   })
+
+  it('cancels obsolete work immediately and cancels the latest work on disposal', async () => {
+    const signals: AbortSignal[] = []
+    const errors: unknown[] = []
+    const scheduler = createRenderScheduler(
+      (_source, signal) => {
+        signals.push(signal)
+        return new Promise<string>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true })
+        })
+      },
+      () => {},
+      (error) => errors.push(error),
+    )
+    scheduler.renderNow('first')
+    scheduler.update('second')
+    expect(signals[0]?.aborted).toBe(true)
+    expect(signals).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(200)
+    expect(signals[1]?.aborted).toBe(false)
+    scheduler.renderNow('third')
+    expect(signals[1]?.aborted).toBe(true)
+    scheduler.dispose()
+    expect(signals[2]?.aborted).toBe(true)
+    await vi.runAllTimersAsync()
+    expect(errors).toEqual([])
+  })
 })
