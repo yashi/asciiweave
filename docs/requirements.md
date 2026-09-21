@@ -62,6 +62,12 @@ and commands belong in [`testing.md`](testing.md).
 - Keep `[source,d2]` blocks as code listings.
 - Cancel obsolete D2 preview work without canceling diagrams that another
   preview or print snapshot still needs.
+- Render `[mermaid]` listing blocks locally in the browser and in print
+  snapshots. Preserve titles, source anchors, and the original exported text.
+- Show Mermaid errors alongside the affected block's source. Keep other
+  document content visible and `[source,mermaid]` blocks as code listings.
+- Discard obsolete Mermaid results and skip obsolete queued diagrams.
+  Editing must not cancel a print snapshot.
 
 ## Preview styles and printing
 

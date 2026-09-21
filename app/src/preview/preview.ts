@@ -5,6 +5,7 @@ import { sourceLineForPosition, sourceSpanForLine, type SourceAnchor } from './s
 import { applyStyle, previewPage } from './page'
 import { defaultStyle, type PreviewStyle } from './styles'
 import { renderD2Blocks, type D2Block } from './d2'
+import { renderMermaidBlocks, type MermaidBlock } from './mermaid'
 
 interface RenderedPreview {
   html: string
@@ -312,6 +313,7 @@ export async function renderPreview(
   const headingIds: string[] = document.hasHeader() ? [titleId] : []
   const tableRowTargets: TableRowTargets[] = []
   const diagrams: D2Block[] = []
+  const mermaidDiagrams: MermaidBlock[] = []
   let generatedId = 0
   const assignedIds = new Set([titleId])
   const nextId = (): string => {
@@ -347,6 +349,9 @@ export async function renderPreview(
       if (context === 'listing' && block.getStyle() === 'd2' && blockId) {
         diagrams.push({ id: blockId, source: (block as Block).getSource() })
       }
+      if (context === 'listing' && block.getStyle() === 'mermaid' && blockId) {
+        mermaidDiagrams.push({ id: blockId, source: (block as Block).getSource() })
+      }
 
       if (context === 'table' && blockId) {
         const rowIds: Array<string | undefined> = []
@@ -381,12 +386,16 @@ export async function renderPreview(
   anchors.sort((left, right) => left.line - right.line)
 
   return {
-    html: await renderD2Blocks(
-      addTableRowAnchors(
-        (await document.convert({ standalone: false })).replace(/^<h1>/, `<h1 id="${titleId}">`),
-        tableRowTargets,
+    html: await renderMermaidBlocks(
+      await renderD2Blocks(
+        addTableRowAnchors(
+          (await document.convert({ standalone: false })).replace(/^<h1>/, `<h1 id="${titleId}">`),
+          tableRowTargets,
+        ),
+        diagrams,
+        signal,
       ),
-      diagrams,
+      mermaidDiagrams,
       signal,
     ),
     anchors,

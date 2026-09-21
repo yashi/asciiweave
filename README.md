@@ -68,6 +68,28 @@ Use `[source,d2]` to display D2 as code instead of a diagram.
 The preview embeds SVG output as images. Diagram links are not clickable.
 asciiweave does not support external file imports or external icons in D2 blocks.
 
+## Mermaid diagrams
+
+Use a `[mermaid]` block to render a diagram in the preview and printed output:
+
+```asciidoc
+.Request flow
+[mermaid]
+----
+flowchart LR
+  browser --> server
+  server --> database
+----
+```
+
+asciiweave loads Mermaid when you first preview or print a Mermaid block.
+The renderer runs in your browser without a diagram service. If rendering
+fails, the preview shows the error above the block's source.
+The `.adoc` download preserves the original Mermaid text.
+
+Use `[source,mermaid]` to display Mermaid as code. Diagrams use SVG images,
+so links and click handlers are inactive. Labels use SVG text.
+
 ## Security and access
 
 asciiweave does not currently implement application-level authentication,

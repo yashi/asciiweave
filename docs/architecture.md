@@ -386,6 +386,30 @@ and shows a text error. The render scheduler rejects stale results after
 diagram rendering completes. Printing uses the same conversion path as the
 preview.
 
+## Mermaid diagrams
+
+The browser renders `[mermaid]` listing blocks with the pinned `mermaid`
+package. Asciidoctor AST traversal collects the literal source before HTML
+conversion. The preview preserves block titles and source anchors.
+Both server targets serve the renderer as browser assets loaded on demand.
+
+Mermaid measures text in a temporary offscreen DOM container. The renderer
+removes the container after success or failure. Calls run serially because
+Mermaid shares configuration and DOM state. A cache holds up to 32 SVG
+results by source text, including results reused by print snapshots.
+
+Mermaid uses strict security mode with SVG text labels. Protected configuration
+keys prevent diagram directives from relaxing security or enabling HTML labels.
+The preview embeds the result as an SVG image with a data URL, which disables
+diagram interactions and isolates SVG styles. The preview iframe keeps its
+existing script restrictions. See the [Mermaid configuration reference](https://mermaid.js.org/config/setup/mermaid/interfaces/MermaidConfig.html).
+
+Mermaid runs on the browser's main thread and does not expose cancellation.
+Active rendering finishes before the queue advances. Aborted conversions skip
+queued diagrams and discard stale results. Print snapshots use independent
+conversions, so preview edits cannot cancel printing. A render failure leaves
+the block's source visible with a text error.
+
 ## Stale-render prevention
 
 Asciidoctor.js v4 conversion is asynchronous, and completions can arrive out

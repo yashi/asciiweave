@@ -147,6 +147,20 @@ npm test -- app/tests/d2.test.ts
 npm run test:e2e -- e2e/d2.spec.ts
 ```
 
+## Mermaid diagrams
+
+`app/tests/mermaid.test.ts` covers caching, render failures, cleanup, and
+cancellation during loading or queued work. It also checks that canceling a
+preview preserves a concurrent print request.
+`e2e/mermaid.spec.ts` tests the bundled renderer in real browsers, including
+collaboration with external requests blocked, Unicode labels, source exports,
+error recovery, code listings, print readiness, and stale-render rejection.
+
+```sh
+npm test -- app/tests/mermaid.test.ts
+npm run test:e2e -- e2e/mermaid.spec.ts
+```
+
 ## TOC navigation
 
 `e2e/toc.spec.ts` covers heading hierarchy, formatted Japanese labels, explicit
