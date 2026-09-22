@@ -410,6 +410,19 @@ queued diagrams and discard stale results. Print snapshots use independent
 conversions, so preview edits cannot cancel printing. A render failure leaves
 the block's source visible with a text error.
 
+## Diagram viewer
+
+The diagram viewer accepts a preview document and an image selector. It
+attaches click and keyboard handlers to matching images and displays the
+selected SVG image URL in a non-modal dialog. The viewer keeps SVG markup
+out of the application's live DOM.
+
+Pointer capture supports moving and resizing across iframe boundaries.
+The viewer constrains its position and size to the browser viewport. It
+uses SVG viewBox dimensions for zoom and keeps a fixed snapshot until
+another image opens. The caller can detach handlers before replacing the
+preview document and dispose of the viewer when the preview closes.
+
 ## Stale-render prevention
 
 Asciidoctor.js v4 conversion is asynchronous, and completions can arrive out
