@@ -88,7 +88,18 @@ fails, the preview shows the error above the block's source.
 The `.adoc` download preserves the original Mermaid text.
 
 Use `[source,mermaid]` to display Mermaid as code. Diagrams use SVG images,
-so links and click handlers are inactive. Labels use SVG text.
+so links and click handlers inside diagrams are inactive. Labels use SVG text.
+
+## Enlarging diagrams
+
+Click a Mermaid diagram to open a floating viewer at actual size. Drag the
+title bar to move it and the bottom-right handle to resize it. The document
+remains available for reading, scrolling, and editing beside the viewer.
+Use the zoom controls or select Fit to see the whole diagram.
+
+Keyboard users can focus a diagram and press Enter or Space. Focus the
+title bar or resize handle and use arrow keys to move or resize the viewer.
+Click Close, or press Escape while the viewer has focus, to close it.
 
 ## Security and access
 

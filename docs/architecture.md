@@ -423,6 +423,10 @@ uses SVG viewBox dimensions for zoom and keeps a fixed snapshot until
 another image opens. The caller can detach handlers before replacing the
 preview document and dispose of the viewer when the preview closes.
 
+The preview attaches the viewer to Mermaid images after each iframe load.
+It removes old handlers before preview replacement. Print conversion does
+not attach viewer controls.
+
 ## Stale-render prevention
 
 Asciidoctor.js v4 conversion is asynchronous, and completions can arrive out

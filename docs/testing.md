@@ -155,6 +155,9 @@ preview preserves a concurrent print request.
 `e2e/mermaid.spec.ts` tests the bundled renderer in real browsers, including
 collaboration with external requests blocked, Unicode labels, source exports,
 error recovery, code listings, print readiness, and stale-render rejection.
+Viewer tests cover enlargement, zoom, dragging, resizing, keyboard access,
+focus restoration, and reading the document while the viewer remains open.
+They also cover viewport constraints, narrow screens, and preview replacement.
 
 ```sh
 npm test -- app/tests/mermaid.test.ts

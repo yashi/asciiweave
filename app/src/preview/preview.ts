@@ -6,6 +6,7 @@ import { applyStyle, previewPage } from './page'
 import { defaultStyle, type PreviewStyle } from './styles'
 import { renderD2Blocks, type D2Block } from './d2'
 import { renderMermaidBlocks, type MermaidBlock } from './mermaid'
+import { createDiagramViewer } from './diagram-viewer'
 
 interface RenderedPreview {
   html: string
@@ -50,6 +51,7 @@ export function createPreview(
   iframe.setAttribute('sandbox', 'allow-same-origin')
   iframe.title = 'AsciiDoc preview'
   container.appendChild(iframe)
+  const diagramViewer = createDiagramViewer(() => iframe.focus())
 
   const toc = createToc(container, (id) => {
     const target = iframe.contentDocument?.getElementById(id)
@@ -198,6 +200,7 @@ export function createPreview(
   }
 
   const loadPage = (preview: RenderedPreview): void => {
+    diagramViewer.detach()
     if (pendingPageLoad) {
       iframe.removeEventListener('load', pendingPageLoad)
     }
@@ -219,6 +222,7 @@ export function createPreview(
       iframeLoaded = true
       if (iframe.contentDocument) {
         scrollDocument = iframe.contentDocument
+        diagramViewer.attach(scrollDocument, '.mermaid-diagram img')
         // Use only converter section headings and the document title. Raw
         // passthrough headings and inline TOC entries are not sections.
         headings = (rendered?.headingIds ?? []).flatMap((id) => {
@@ -284,6 +288,7 @@ export function createPreview(
       disposed = true
       scheduler.dispose()
       toc.dispose()
+      diagramViewer.dispose()
       if (followFrame !== undefined) {
         cancelAnimationFrame(followFrame)
       }

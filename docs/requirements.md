@@ -68,6 +68,13 @@ and commands belong in [`testing.md`](testing.md).
   document content visible and `[source,mermaid]` blocks as code listings.
 - Discard obsolete Mermaid results and skip obsolete queued diagrams.
   Editing must not cancel a print snapshot.
+- Clicking a Mermaid diagram opens an opaque floating viewer with zoom,
+  actual-size, and fit controls. Allow moving and resizing the viewer with
+  pointer or keyboard input. Keep the document interactive beside the viewer.
+  Support keyboard activation and Escape to close while the viewer has focus.
+  Keep the viewer within the browser window when the viewport shrinks.
+  Keep the displayed diagram stable during preview updates and omit viewer
+  controls from print snapshots.
 
 ## Preview styles and printing
 
