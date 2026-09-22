@@ -222,7 +222,7 @@ export function createPreview(
       iframeLoaded = true
       if (iframe.contentDocument) {
         scrollDocument = iframe.contentDocument
-        diagramViewer.attach(scrollDocument, '.mermaid-diagram img')
+        diagramViewer.attach(scrollDocument, '.mermaid-diagram img, .d2-diagram img')
         // Use only converter section headings and the document title. Raw
         // passthrough headings and inline TOC entries are not sections.
         headings = (rendered?.headingIds ?? []).flatMap((id) => {

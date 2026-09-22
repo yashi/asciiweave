@@ -138,6 +138,7 @@ collaboration test blocks external requests. The browser tests cover:
 - preservation of the original source in exports
 - error recovery and multiple diagrams
 - D2 code listings
+- enlargement, zoom, keyboard activation, moving, resizing, and focus restoration
 - image readiness before printing
 - rejection of stale renders
 - recovery from a stalled worker request after an edit.
@@ -162,6 +163,16 @@ They also cover viewport constraints, narrow screens, and preview replacement.
 ```sh
 npm test -- app/tests/mermaid.test.ts
 npm run test:e2e -- e2e/mermaid.spec.ts
+```
+
+## Shared diagram viewer
+
+`e2e/diagram-viewer.spec.ts` tests switching between Mermaid and D2 diagrams
+while the same viewer remains open. It checks the displayed image and
+focus restoration when the viewer closes.
+
+```sh
+npm run test:e2e -- e2e/diagram-viewer.spec.ts
 ```
 
 ## TOC navigation

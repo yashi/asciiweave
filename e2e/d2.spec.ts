@@ -3,6 +3,50 @@ import { createDoc, getText, openPair, setSourceViaYjs } from './helpers'
 
 const source = '= Diagrams\n\n.Flow\n[d2]\n----\nclient -> server: 日本語\n----\n\nAfter diagram.'
 
+test('D2 diagrams open in the floating viewer with zoom and keyboard controls', async ({
+  page,
+}) => {
+  await createDoc(page)
+  await setSourceViaYjs(page, source)
+  const diagram = page.frameLocator('.preview-frame').getByRole('button', { name: 'Enlarge Flow' })
+  await expect(diagram).toBeVisible({ timeout: 20_000 })
+  await diagram.click()
+  const viewer = page.getByRole('dialog', { name: 'Enlarged diagram' })
+  await expect(viewer).toBeVisible()
+  const image = viewer.locator('img')
+  await expect(image).toHaveAttribute('src', (await diagram.getAttribute('src'))!)
+  await expect(image).toHaveAttribute('alt', 'Flow')
+  const size = await image.evaluate((img: HTMLImageElement) => {
+    const svg = new DOMParser().parseFromString(
+      decodeURIComponent(img.src.slice(img.src.indexOf(',') + 1)),
+      'image/svg+xml',
+    ).documentElement
+    return svg
+      .getAttribute('viewBox')!
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number)
+  })
+  expect((await image.boundingBox())!.width).toBeCloseTo(size[2]!, 0)
+  expect((await image.boundingBox())!.height).toBeCloseTo(size[3]!, 0)
+  await viewer.getByRole('button', { name: 'Zoom in' }).click()
+  expect((await image.boundingBox())!.width).toBeCloseTo(size[2]! * 1.25, 0)
+  const bounds = (await viewer.boundingBox())!
+  await viewer.getByRole('button', { name: 'Move diagram viewer' }).press('ArrowRight')
+  expect((await viewer.boundingBox())!.x).toBeCloseTo(bounds.x + 10, 0)
+  await viewer.getByRole('button', { name: 'Resize diagram viewer' }).press('ArrowLeft')
+  expect((await viewer.boundingBox())!.width).toBeCloseTo(bounds.width - 10, 0)
+  await page.keyboard.press('Escape')
+  await expect(viewer).not.toBeVisible()
+  await expect(diagram).toBeFocused()
+  for (const key of ['Enter', 'Space']) {
+    await diagram.press(key)
+    await expect(viewer).toBeVisible()
+    await viewer.getByRole('button', { name: 'Close', exact: true }).click()
+    await expect(diagram).toBeFocused()
+  }
+})
+
 test('D2 renders locally for collaborators and preserves source export', async ({
   browser,
   baseURL,
@@ -98,6 +142,7 @@ test('D2 images are ready in the print snapshot', async ({ page }) => {
   const frame = page.locator('.print-frame')
   await expect(frame).toHaveAttribute('data-print-called', 'true', { timeout: 20_000 })
   const diagram = page.frameLocator('.print-frame').locator('.d2-diagram img')
+  await expect(page.frameLocator('.print-frame').locator('.diagram-enlarge')).toHaveCount(0)
   expect(
     await diagram.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0),
   ).toBe(true)

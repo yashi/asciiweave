@@ -92,7 +92,7 @@ so links and click handlers inside diagrams are inactive. Labels use SVG text.
 
 ## Enlarging diagrams
 
-Click a Mermaid diagram to open a floating viewer at actual size. Drag the
+Click a D2 or Mermaid diagram to open a floating viewer at actual size. Drag the
 title bar to move it and the bottom-right handle to resize it. The document
 remains available for reading, scrolling, and editing beside the viewer.
 Use the zoom controls or select Fit to see the whole diagram.
